@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>100 Prisoners Problem</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .boxes {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+        }
+        .box {
+            aspect-ratio: 1;
+            border: 2px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: white;
+            font-size: 14px;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .box.opened {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .box.success {
+            background: #e8f5e9;
+            border-color: #4caf50;
+        }
+        .box.failure {
+            background: #ffebee;
+            border-color: #f44336;
+        }
+        .box-number {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 10px;
+            color: #666;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #2196f3;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #bdbdbd;
+            cursor: not-allowed;
+        }
+        .stats {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>100 Prisoners Problem Simulator</h1>
+        
+        <div class="controls">
+            <button id="reset">Reset Game</button>
+            <button id="simulate">Simulate One Prisoner</button>
+            <button id="simulateAll">Simulate All Prisoners</button>
+        </div>
+
+        <div class="stats">
+            <p>Current Prisoner: <span id="currentPrisoner">-</span></p>
+            <p>Boxes Opened: <span id="boxesOpened">0</span>/50</p>
+            <p>Success Rate: <span id="successRate">0</span>%</p>
+        </div>
+
+        <div class="boxes" id="boxesContainer"></div>
+    </div>
+
+    <script>
+        class PrisonersProblem {
+            constructor() {
+                this.boxCount = 100;
+                this.maxAttempts = 50;
+                this.boxes = new Array(this.boxCount);
+                this.currentPrisoner = null;
+                this.openedBoxes = new Set();
+                this.successfulPrisoners = new Set();
+                this.simulationCount = 0;
+                
+                this.initializeDOM();
+                this.reset();
+                this.addEventListeners();
+            }
+
+            initializeDOM() {
+                const container = document.getElementById('boxesContainer');
+                container.innerHTML = '';
+                
+                for (let i = 0; i < this.boxCount; i++) {
+                    const box = document.createElement('div');
+                    box.className = 'box';
+                    box.innerHTML = `<span class="box-number">${i + 1}</span><span class="content"></span>`;
+                    container.appendChild(box);
+                }
+            }
+
+            reset() {
+                // Create random permutation
+                this.boxes = Array.from({length: this.boxCount}, (_, i) => i + 1);
+                for (let i = this.boxes.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.boxes[i], this.boxes[j]] = [this.boxes[j], this.boxes[i]];
+                }
+                
+                this.currentPrisoner = null;
+                this.openedBoxes.clear();
+                this.successfulPrisoners.clear();
+                this.simulationCount = 0;
+                
+                // Reset UI
+                const boxes = document.querySelectorAll('.box');
+                boxes.forEach(box => {
+                    box.className = 'box';
+                    box.querySelector('.content').textContent = '';
+                });
+                
+                this.updateStats();
+            }
+
+            async simulatePrisoner(prisonerNumber) {
+                this.currentPrisoner = prisonerNumber;
+                this.openedBoxes.clear();
+                
+                let currentBox = prisonerNumber - 1;
+                let found = false;
+                
+                for (let attempt = 0; attempt < this.maxAttempts; attempt++) {
+                    // Open box and check number
+                    this.openedBoxes.add(currentBox);
+                    const boxContent = this.boxes[currentBox];
+                    
+                    // Update UI
+                    const boxElement = document.querySelectorAll('.box')[currentBox];
+                    boxElement.classList.add('opened');
+                    boxElement.querySelector('.content').textContent = boxContent;
+                    
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    if (boxContent === prisonerNumber) {
+                        found = true;
+                        break;
+                    }
+                    
+                    currentBox = boxContent - 1;
+                }
+                
+                // Update UI with result
+                this.openedBoxes.forEach(boxIndex => {
+                    const boxElement = document.querySelectorAll('.box')[boxIndex];
+                    boxElement.classList.remove('opened');
+                    boxElement.classList.add(found ? 'success' : 'failure');
+                });
+                
+                if (found) {
+                    this.successfulPrisoners.add(prisonerNumber);
+                }
+                
+                this.simulationCount++;
+                this.updateStats();
+                
+                return found;
+            }
+
+            async simulateAll() {
+                for (let i = 1; i <= this.boxCount; i++) {
+                    const success = await this.simulatePrisoner(i);
+                    if (!success) break;
+                }
+            }
+
+            updateStats() {
+                document.getElementById('currentPrisoner').textContent = this.currentPrisoner || '-';
+                document.getElementById('boxesOpened').textContent = this.openedBoxes.size;
+                document.getElementById('successRate').textContent = 
+                    this.simulationCount ? 
+                    ((this.successfulPrisoners.size / this.simulationCount) * 100).toFixed(1) : 
+                    '0';
+            }
+
+            addEventListeners() {
+                document.getElementById('reset').addEventListener('click', () => this.reset());
+                document.getElementById('simulate').addEventListener('click', () => {
+                    const randomPrisoner = Math.floor(Math.random() * this.boxCount) + 1;
+                    this.simulatePrisoner(randomPrisoner);
+                });
+                document.getElementById('simulateAll').addEventListener('click', () => this.simulateAll());
+            }
+        }
+
+        // Initialize the game
+        const game = new PrisonersProblem();
+    </script>
+</body>
+</html>
